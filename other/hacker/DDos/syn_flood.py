@@ -47,4 +47,4 @@ if __name__ == '__main__':
     if sys.platform != 'linux':
         exit(f'请使用Linux系统执行此代码，你当前的系统是：{sys.platform}')
 
-    thread_run('47.243.162.23', 48267, count = 65536, maxNumberThreads = 16)
+    thread_run('0.0.0.0', 443, count = 65536, maxNumberThreads = 16)

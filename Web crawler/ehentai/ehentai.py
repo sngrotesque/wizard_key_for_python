@@ -64,7 +64,7 @@ class ehentai:
 
             fwrite(fn, self.http_get(link).content, mode = 'wb')
 
-ctx = ehentai(save_path = 'e_save')
+ctx = ehentai(save_path = 'e_save', proxies='http://localhost:8081/')
 res = ctx.getAllPages('https://e-hentai.org/g/2786901/9aa74c9e05/')
 res = ctx.getAllArtworkLists(res)
 res = ctx.download(res)

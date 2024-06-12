@@ -1,4 +1,5 @@
 from Crypto.Cipher import AES
+from Crypto.Util import Counter
 import hashlib
 import rsa
 import os
@@ -18,7 +19,8 @@ def sha256(content :bytes):
     return hashlib.sha256(content).digest()
 
 def aes_ctr_xcrypt(content :bytes, key :bytes, nonce :bytes):
-    return AES.new(mode = AES.MODE_CTR, key = key, nonce = nonce).encrypt(content)
+    nonce = Counter.new((AES.block_size - len(nonce)) * 8, prefix = nonce)
+    return AES.new(mode = AES.MODE_CTR, key = key, counter = nonce).encrypt(content)
 
 class fc:
     def __init__(self, inPath :str, outPath :str, PubKeyPEM_Path :str, PriKeyPEM_Path :str, overwriteFile :bool = True):
