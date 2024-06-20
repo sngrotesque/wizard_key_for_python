@@ -127,9 +127,9 @@ def demo(uid :int, imageSavePath :str):
 
 if __name__ == '__main__':
     # demo(1177593795, '哔哩哔哩-测试')
-    blbl = articles(512675827)
+    blbl = articles(512675827, imageSavePath='Arknights_Memes')
     
-    start = time.time()
-    blbl.multiThreadDownload()
-    stop = time.time()
-    print(f'用时：{stop-start:.2f}')
+    image_url_list = blbl.getArticleCVPicturesLink('https://www.bilibili.com/read/cv17317691/')
+
+    for url in image_url_list:
+        print(blbl.download(url))

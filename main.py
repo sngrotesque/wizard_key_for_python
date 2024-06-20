@@ -1,4 +1,6 @@
 from typing import Callable
+import hashlib
+import base64
 import wtools
 import random
 import socket
@@ -53,18 +55,26 @@ def create_trueRandom_number(min :int, max :int):
 
     return random_number % (max - min + 1) + min
 
-def client(path :str):
-    fd = socket.socket()
-    fd.connect(('127.0.0.1', 80))
-    data = wtools.utils.fread(path)
+def pixiv_use(get_follow_list :bool = False):
+    follow_list_save_path = 'pixiv_follower.txt'
+    pitcher_list_save_path = 'F:/Pitchers/Pixiv'
+    https_proxies = 'http://localhost:8081'
+    
+    pix = wtools.pixiv(38279179, 'E:/pixiv_cookie.txt', save_path = pitcher_list_save_path,
+                    proxies = https_proxies, maxNumberThreads=16)
+    
+    if get_follow_list:
+        print('开始获取关注列表的所有作者ID...')
+        artist_list = pix.getTotalArtistList()
+        print(f'获取完毕，保存至{follow_list_save_path}')
+        wtools.utils.fwrite(follow_list_save_path,
+                            data = '\n'.join(artist_list).encode())
+    else:
+        artist_list = wtools.utils.fread(follow_list_save_path).decode().split()
+    
+    for artist_id in artist_list:
+        pix.multiThreadedDownload(artist_id, f'{pitcher_list_save_path}/{artist_id}')
+        break
 
-    fd.send(struct.pack('<I', len(data)))
-    fd.sendall(data)
-    print(fd.recv(5))
-
-    fd.close()
-
-data = os.urandom(int(256.71*1024**2))
-wtools.utils.fwrite('test_file', data = data)
-
-client('test_file')
+if __name__ == '__main__':
+    pixiv_use()

@@ -8,3 +8,5 @@ from .packet import packet
 from .image import imgToTextImage
 
 from .pixiv import pixiv
+
+from .win_key import Win10_license

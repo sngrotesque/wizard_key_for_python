@@ -5,11 +5,9 @@ import hashlib
 import os
 
 # 如果args为字符串类型，那么会被作为路径使用，如果为字节串类型，那么会被当做数据使用。否则抛出运行时异常。
-def get_digest(args :Union[str, bytes, bytearray], method = None):
-    if not method:
-        method = hashlib.sha256()
+def get_digest(args :Union[str, bytes, bytearray], method = 'sha256'):
     block_size = 512 * 1024**2
-    sha256_ctx = method
+    sha256_ctx = hashlib.new(method)
     if isinstance(args, str):
         with open(args, 'rb') as f:
             while True:
@@ -24,8 +22,8 @@ def get_digest(args :Union[str, bytes, bytearray], method = None):
         raise RuntimeError(f'unknown args: {args}.')
     return sha256_ctx.digest()
 
-def generate_keyWithIV(password :bytes, salt :bytes, key_len :int = 32, iv_len :int = 16):
-    content = PBKDF2(password, salt, (key_len + iv_len), 7881)
+def generate_keyWithIV(password :bytes, salt :bytes, count :int = 16601, key_len :int = 32, iv_len :int = 16):
+    content = PBKDF2(password, salt, (key_len + iv_len), count)
     return content[:key_len], content[-iv_len:]
 
 def aes_encrypt(data :bytes, key :bytes, mode :int, iv :bytes = ..., nonce :bytes = ..., counter :dict = ..., segment_size :int = ...):

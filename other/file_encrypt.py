@@ -39,7 +39,7 @@ class fc:
 
         self.aes_key   :bytes = None
         self.aes_nonce :bytes = None
-        self.aes_mode  :int   = AES.MODE_CTR
+        self.aes_mode  :int   = AES.MODE_CFB
 
         self.inPath  = inPath
         self.outPath = outPath
@@ -82,7 +82,10 @@ class fc:
                     UnableVerifySecurityFile(self.inPath)
                 fw.write(plaintext)
 
-inPath  = 'i:/Pitchers/'
-outPath = 'C:/Users/z7z-h/Desktop/fileCipher_test/W_plaintext.png'
-ctx = fc(inPath, outPath, './RSA_PubKey.pem', './RSA_PriKey.pem')
+# GeneratePairPublicPrivatekeys('RSAPublicKey.pem', 'RSAPrivateKey.pem', 3072)
+
+# inPath  = 'F:/PhoneFiles/Pictures/QQ/令-儒宅.png'
+inPath = 'C:/Users/sn/Desktop/收纳/fcipher/cipher.png'
+outPath = 'C:/Users/sn/Desktop/收纳/fcipher/plain.png'
+ctx = fc(inPath, outPath, 'RSAPublicKey.pem', 'RSAPrivateKey.pem')
 ctx.decrypt()

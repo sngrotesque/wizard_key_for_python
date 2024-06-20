@@ -1,4 +1,4 @@
-from typing import Union, List, Callable
+from typing import Union, List, Callable, Tuple
 from .utils import fread, fwrite
 from zipfile import ZipFile
 import threading
@@ -8,7 +8,7 @@ import cv2
 import re
 import os
 
-STATUS_DONE = 1
+STATUS_DONE   = 1
 STATUS_EXISTS = -1
 STATUS_FAILED = 0
 
@@ -54,7 +54,7 @@ class pixiv:
         }
 
     # 开启指定数量的线程并执行
-    def threads(self, func :Callable, url_list :List[str]):
+    def __threads(self, func :Callable, url_list :List[str]):
         th_list = [threading.Thread(target = func, args = (thId, url_list)) for thId in range(self.maxNumberThreads)]
 
         for th in th_list:
@@ -64,16 +64,16 @@ class pixiv:
             th.join()
 
     # 封装HTTP请求
-    def http_get(self, url :str):
+    def __http_get(self, url :str):
         return requests.get(url, headers = self.headers, proxies = self.proxies)
 
     # 根据下载链接来创建一个文件名
-    def createFileName(self, url :str):
+    def __createFileName(self, url :str):
         return re.findall(r'\w+://[a-zA-Z0-9.\-\_]+/[a-zA-Z\-\_]+/img/([0-9a-zA-Z./\_]+)',
             url, re.S | re.I)[0].replace('/', '_')
 
     # 指定一个Jpg图像文件路径的列表，将它们依次转为视频的每一帧
-    def jpgToMp4(self, inPath :List[str], outPath :str, fps :int = 15):
+    def __jpgToMp4(self, inPath :List[str], outPath :str, fps :int = 15):
         img_array = []
 
         for filename in inPath:
@@ -89,7 +89,7 @@ class pixiv:
         out.release()
 
     # 将Zip压缩包里面的图像转为视频
-    def zipToMp4(self, link :str, fileSavePath :str, content :bytes, folder :str):
+    def __zipToMp4(self, link :str, fileSavePath :str, content :bytes, folder :str):
         fwrite(fileSavePath, data = content)
 
         with ZipFile(fileSavePath, 'r') as ctx:
@@ -102,9 +102,9 @@ class pixiv:
             ctx.extractall(jpgToMp4TempSavePath)
 
         jpgPath = [os.path.join(jpgToMp4TempSavePath, fn) for fn in zip_filename_list]
-        gifFileName = self.createFileName(link).replace('zip', 'mp4')
+        gifFileName = self.__createFileName(link).replace('zip', 'mp4')
 
-        self.jpgToMp4(jpgPath, os.path.join(folder, gifFileName))
+        self.__jpgToMp4(jpgPath, os.path.join(folder, gifFileName))
 
         for fn in jpgPath:
             os.remove(fn)
@@ -114,7 +114,7 @@ class pixiv:
 
     # 获取指定页码中所有作者ID
     def getArtistList(self, page :int, offset :int) -> List[str]:
-        res = self.http_get(f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
+        res = self.__http_get(f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
             f'?offset={page * offset}&limit={offset}&rest=show').json()
 
         # 如果获取完毕就返回一个False
@@ -136,7 +136,7 @@ class pixiv:
     # 多线程获取指定作者的所有作品中的所有图像的链接
     # 这个方法如果改为单线程，那么速度堪忧并且没法兼容多线程下载图像
     def getIllustsImagesLink(self, artistID :Union[str, int]):
-        artworks = [*self.http_get(f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
+        artworks = [*self.__http_get(f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
             f'?lang=zh').json()['body']['illusts'].keys()]
 
         self.links = []
@@ -146,8 +146,8 @@ class pixiv:
                 dynamicImageUrl = f'https://www.pixiv.net/ajax/illust/{artworks[pid]}/ugoira_meta?lang=zh'
                 staticImageUrl = f'https://www.pixiv.net/ajax/illust/{artworks[pid]}/pages?lang=zh'
 
-                dynamicImage_result = self.http_get(dynamicImageUrl).json()
-                statucImage_result = self.http_get(staticImageUrl).json()
+                dynamicImage_result = self.__http_get(dynamicImageUrl).json()
+                statucImage_result = self.__http_get(staticImageUrl).json()
 
                 if not dynamicImage_result['error']:
                     self.links.append(dynamicImage_result['body']['originalSrc'])
@@ -155,7 +155,7 @@ class pixiv:
                     for index in statucImage_result['body']:
                         self.links.append(index['urls']['original'])
 
-        self.threads(get_images, artworks)
+        self.__threads(get_images, artworks)
 
         return self.links
 
@@ -168,14 +168,14 @@ class pixiv:
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
 
-        fileSavePath = os.path.join(self.save_path, self.createFileName(url))
+        fileSavePath = os.path.join(self.save_path, self.__createFileName(url))
 
         if os.path.exists(fileSavePath) or os.path.exists(fileSavePath.replace('zip', 'mp4')):
             return STATUS_EXISTS
 
         while True:
             try:
-                response = self.http_get(url)
+                response = self.__http_get(url)
                 break
             except:
                 if not retry_count:
@@ -184,11 +184,11 @@ class pixiv:
 
         if response.headers['Content-Type'] == 'application/zip':
             if zipToMp4:
-                self.zipToMp4(url, fileSavePath, response.content, self.save_path)
+                self.__zipToMp4(url, fileSavePath, response.content, self.save_path)
             else:
-                fwrite(fileSavePath, response.content)
+                fwrite(fileSavePath, data = response.content)
         else:
-            fwrite(fileSavePath, response.content)
+            fwrite(fileSavePath, data = response.content)
 
         return STATUS_DONE
 
@@ -196,11 +196,11 @@ class pixiv:
     def multiThreadedDownload(self, artistID :Union[str, int], ReSpecifyPath :str = None):
         def _download(thID :int, links :List[str]):
             for index in range(thID, len(links), self.maxNumberThreads):
-                fn = self.createFileName(links[index])
-                print(f'Thread[{thID:02x}] download \'{fn}\'')
+                # print(f'Thread[{thID:02x}] download \'{fn}\'')
                 status = self.download(links[index], zipToMp4 = True, ReSpecifyPath = ReSpecifyPath)
-                if status == STATUS_EXISTS:
-                    print(f'Thread[{thID:02x}] download \'{fn}\', Exists.')
-                elif status == STATUS_FAILED:
-                    print(f'Thread[{thID:02x}] download \'{fn}\', Failed.')
-        self.threads(_download, self.getIllustsImagesLink(artistID))
+                # fn = self.__createFileName(links[index])
+                # if status == STATUS_EXISTS:
+                #     print(f'Thread[{thID:02x}] download \'{fn}\', Exists.')
+                # elif status == STATUS_FAILED:
+                #     print(f'Thread[{thID:02x}] download \'{fn}\', Failed.')
+        self.__threads(_download, self.getIllustsImagesLink(artistID))
