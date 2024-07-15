@@ -1,3 +1,6 @@
+from Crypto.Cipher import AES, DES, DES3, ChaCha20
+
+from wtools.utils import fread, fwrite
 from typing import Callable
 import hashlib
 import base64
@@ -9,8 +12,6 @@ import time
 import sys
 import re
 import os
-
-import wtools.utils
 
 def fcipher_xcrypt():
     if len(sys.argv) < 5:
@@ -52,7 +53,7 @@ def create_true_random_number(min :int, max :int):
     return random_number % (max - min + 1) + min
 
 def pixiv_use(get_follow_list :bool = False):
-    follow_list_save_path = 'pixiv_follower.txt'
+    follow_list_save_path = './other/pixiv_follower.txt'
     pitcher_list_save_path = 'F:/Pitchers/Pixiv'
     https_proxies = 'http://localhost:8081'
     
@@ -72,24 +73,49 @@ def pixiv_use(get_follow_list :bool = False):
         pix.multi_threaded_download(artist_id, f'{pitcher_list_save_path}/{artist_id}')
         break
 
-def speed_test():
-    buffer = os.urandom(256 * 1024**2)
+def encryption_speed_test(algorithmName: str = 'aes', key_len :int = 32, iv_len :int = 16):
+    def encryption_timer(ctx, plaintext :bytes):
+        start_timer = time.time()
+        encrypted   = ctx.encrypt(plaintext)
+        stop_timer  = time.time()
+        
+        # 此内容是为了encrypted不被优化掉
+        print(f'{encrypted[0]:02x}\b\b',end='')
+        
+        return stop_timer-start_timer
+    ctx = None
+    key = os.urandom(key_len)
+    iv  = os.urandom(iv_len)
 
-    print(f'original buffer length: {len(buffer)}.')
+    match algorithmName.lower():
+        case 'aes':
+            ctx = AES.new(key, mode = AES.MODE_CBC, iv = iv)
+        case 'des':
+            ctx = DES.new(key, mode = DES.MODE_CBC, iv = iv)
+        case '3des' | 'des3' | 'tdes':
+            ctx = DES3.new(key, mode = DES3.MODE_CBC, iv = iv)
+        case 'chacha20' | 'cc20':
+            ctx = ChaCha20.new(key = key, nonce = iv)
+        case _:
+            raise TypeError(f'暂不支持{algorithmName}呢~')
 
-    start = time.time()
-    result = base64.b64encode(buffer)
-    stop = time.time()
+    print(f'current algorithm name: {algorithmName}')
 
-    print(f'encoding time: {stop-start:.4f}')
+    randomData_16MB   = bytes(16  * 1024**2)
+    randomData_512MB  = bytes(512 * 1024**2)
+    randomData_1024MB = bytes(      1024**3)
 
-    start = time.time()
-    result = base64.b64decode(result)
-    stop = time.time()
+    timer_16MB = encryption_timer(ctx, randomData_16MB)
+    print(f'16MB   time used: {timer_16MB:.4f}')
 
-    print(f'decoding time: {stop-start:.4f}')
+    timer_512MB = encryption_timer(ctx, randomData_512MB)
+    print(f'512MB  time used: {timer_512MB:.4f}')
 
-def total_download_time_required(TotalDownload :float, DownloadSpeed :float, TotalDwonloadUnit: str = 'GB', DownloadSpeedUnit :str = 'MB'):
+    timer_1024MB = encryption_timer(ctx, randomData_1024MB)
+    print(f'1024MB time used: {timer_1024MB:.4f}')
+
+def total_download_time_required(TotalDownload :float, DownloadSpeed :float,
+                                 TotalDwonloadUnit: str = 'GB', DownloadSpeedUnit :str = 'MB'):
     def _match_func(unit :str, download :float):
         match unit:
             # byte per second
@@ -119,4 +145,4 @@ def camel_to_snake(name):
     return re.sub(r'([a-z])([A-Z])', r'\1_\2', name).lower()
 
 if __name__ == '__main__':
-    print(camel_to_snake('TotalDownloadTimeRequired'))
+    encryption_speed_test(algorithmName='cc20', key_len=32, iv_len=12)

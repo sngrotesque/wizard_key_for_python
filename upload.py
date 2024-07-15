@@ -27,8 +27,6 @@ class git_process:
         self.path              = os.listdir(folder_path)
 
         self.path.remove('.git')
-        if os.path.exists('pixiv_follower.txt'):
-            self.path.remove('pixiv_follower.txt')
         if os.path.exists('other'):
             self.path.remove('other')
 

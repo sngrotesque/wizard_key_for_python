@@ -1,5 +1,6 @@
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
+from Crypto.Util import Counter
 from typing import Union
 import hashlib
 import os
