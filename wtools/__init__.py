@@ -5,8 +5,8 @@ from .kcp import w_kcp
 
 from .packet import packet
 
-from .image import imgToTextImage
+from .image import ImageToCharacterImage
 
 from .pixiv import pixiv
 
-from .win_key import Win10_license
+from .win_key import win10_license

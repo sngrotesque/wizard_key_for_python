@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
-class imgToTextImage:
+class ImageToCharacterImage:
     def __init__(self, src_path :str, dst_path :str,
                 resize_factor :float = 0.7,
                 sample_step   :int   = 3,

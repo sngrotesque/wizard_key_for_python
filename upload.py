@@ -1,32 +1,34 @@
-from subprocess import Popen, PIPE, call
 from git.repo import Repo
-import sys, re, os
+import subprocess
+import sys
+import re
+import os
+
+DEFINED_FOLDER_PATH = '.'
+DEFINED_REMOTE_URL  = 'git@github.com:sngrotesque/WMKC_Python.git'
+DEFINED_COMMIT      = 'The wizard\'s universal key for Python'
+DEFINED_VERSION     = 'v1.1.0'
 
 def RunPopen(cmd :str):
-    p = Popen(cmd, shell=True, stdout=PIPE)
+    p = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE)
     return p.stdout.read().decode()
 
 def RunCommand(cmd :str):
-    call(cmd, shell=True)
-
-def deleteListData(OriginalList :list, dataContent: str):
-    x = 0
-    while x < len(OriginalList):
-        if OriginalList[x][:3] == dataContent:
-            OriginalList.pop(x);
-            x -= 1
-        x += 1
+    return subprocess.call(cmd, shell = True)
 
 class git_process:
-    def __init__(self, folder_path :str = '.'):
+    def __init__(self, folder_path :str = DEFINED_FOLDER_PATH):
         self.repo              = Repo.init(folder_path)
-        self.DefinedRemoteUrl  = 'git@github.com:sngrotesque/WMKC_Python.git'
-        self.DefinedCommit     = 'Wizard Magic Key Cyber for Python'
-        self.DefinedVersion    = 'v1.0.0'
+        self.DefinedRemoteUrl  = DEFINED_REMOTE_URL
+        self.DefinedCommit     = DEFINED_COMMIT
+        self.DefinedVersion    = DEFINED_VERSION
         self.DefinedFolderPath = folder_path
 
-        self.path = os.listdir(folder_path)
+        self.path              = os.listdir(folder_path)
+
         self.path.remove('.git')
+        if os.path.exists('pixiv_follower.txt'):
+            self.path.remove('pixiv_follower.txt')
 
     def view(self):
         print(f'>>>> +---------- 现有文件(BEGIN) ----------+')
@@ -35,19 +37,18 @@ class git_process:
         print(f'>>>> +---------- 现有文件(END)   ----------+')
 
     def versionCheck(self):
-        branch_version = RunPopen('git branch')
-        
+        branch_version        = RunPopen('git branch')
+
         branch_name_0_regular = r'\s+(v[\d.]+\-\w+)'
         branch_name_1_regular = r'\s+(v[\d.]+_\w+)'
         branch_name_2_regular = r'\s+(v[\d.]+)'
         branch_name_3_regular = r'\s+(\w+\_v[\d.]+)'
         
-        versionList_0 = re.findall(branch_name_0_regular, branch_version, re.S)
-        versionList_1 = re.findall(branch_name_1_regular, branch_version, re.S)
-        versionList_2 = re.findall(branch_name_2_regular, branch_version, re.S)
-        versionList_3 = re.findall(branch_name_3_regular, branch_version, re.S)
-        
-        versionList = versionList_0 + versionList_1 + versionList_2 + versionList_3
+        versionList = \
+            re.findall(branch_name_0_regular, branch_version, re.S) + \
+            re.findall(branch_name_1_regular, branch_version, re.S) + \
+            re.findall(branch_name_2_regular, branch_version, re.S) + \
+            re.findall(branch_name_3_regular, branch_version, re.S)
         
         if self.DefinedVersion not in versionList:
             RunCommand(f'git checkout -b {self.DefinedVersion}')

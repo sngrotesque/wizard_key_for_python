@@ -35,20 +35,15 @@ other_edition = [
     "2F77B-TNFGY-69qqF-B8YKP-D69TJ"
 ]
 
-class Win10_license:
-    def __init__(self, license_key :str, activate_server :str = None):
-        self.license_key = license_key
-        self.activate_server = activate_server
-
-    def __run(self, cmd :str):
+def win10_license(key :str, activate_server :str = None):
+    def run(cmd :str):
         return subprocess.call(cmd, shell=True)
-
-    def activation(self):
-        # 删除当前产品密钥
-        self.__run(f'slmgr /upk')
-        # 安装用户选定的产品密钥
-        self.__run(f'slmgr /ipk {self.license_key}')
-        # 更改激活服务器
-        self.__run(f'slmgr /skms {self.activate_server}')
-        # 开始激活系统
-        self.__run(f'slmgr /ato')
+    # 删除当前产品密钥
+    run(f'slmgr /upk')
+    # 安装用户选定的产品密钥
+    run(f'slmgr /ipk {key}')
+    # 更改激活服务器
+    if activate_server:
+        run(f'slmgr /skms {activate_server}')
+    # 开始激活系统
+    run(f'slmgr /ato')
