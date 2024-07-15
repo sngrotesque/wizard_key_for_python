@@ -5,9 +5,9 @@ import re
 import os
 
 DEFINED_FOLDER_PATH = '.'
-DEFINED_REMOTE_URL  = 'git@github.com:sngrotesque/WMKC_Python.git'
+DEFINED_REMOTE_URL  = 'git@github.com:sngrotesque/wizard_key_for_python.git'
 DEFINED_COMMIT      = 'The wizard\'s universal key for Python'
-DEFINED_VERSION     = 'v1.1.0'
+DEFINED_VERSION     = 'v0.1.1'
 
 def RunPopen(cmd :str):
     p = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE)
@@ -29,6 +29,8 @@ class git_process:
         self.path.remove('.git')
         if os.path.exists('pixiv_follower.txt'):
             self.path.remove('pixiv_follower.txt')
+        if os.path.exists('other'):
+            self.path.remove('other')
 
     def view(self):
         print(f'>>>> +---------- 现有文件(BEGIN) ----------+')
