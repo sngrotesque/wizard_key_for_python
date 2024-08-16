@@ -7,7 +7,7 @@
 ### Change log
 
 - v0.1.2 (preview)
-1. 将pixiv库增加一个单独下载指定作品ID的功能。比如指定https://www.pixiv.net/artworks/12345678，那就下载这一个页面所有的作品图像。
+1. 将pixiv库增加一个单独下载指定作品ID的功能。比如指定`https://www.pixiv.net/artworks/12345678`，那就下载这一个页面所有的作品图像。
 
 - v0.1.1
 1. 将开发环境的Python版本从[3.7.5](https://www.python.org/downloads/release/python-375/)更换至[3.11.9](https://www.python.org/downloads/release/python-3119/)，为的是使用更新的语法和功能（比方说[match语句](https://docs.python.org/zh-cn/3/reference/compound_stmts.html#the-match-statement)，[海象运算符 :=](https://docs.python.org/zh-cn/3/whatsnew/3.8.html#assignment-expressions)等）。
