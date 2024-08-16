@@ -1,17 +1,18 @@
 from Crypto.Cipher import AES, DES, DES3, ChaCha20
-
-from wtools.utils import fread, fwrite
-from typing import Callable
+from wuk.utils import fread, fwrite
 import hashlib
 import base64
-import wtools
 import random
 import socket
 import struct
 import time
 import sys
+import ssl
+import wuk
 import re
 import os
+
+import inspect
 
 def fcipher_xcrypt():
     if len(sys.argv) < 5:
@@ -32,7 +33,7 @@ def fcipher_xcrypt():
         else:
             exit('error input.')
     
-    ctx = wtools.fcipher(password.encode())
+    ctx = wuk.fcipher(password.encode())
     
     if xcrypt_mode == 'e':
         ctx.encrypt(input_path, output_path)
@@ -57,17 +58,17 @@ def pixiv_use(get_follow_list :bool = False):
     pitcher_list_save_path = 'F:/Pitchers/Pixiv'
     https_proxies = 'http://localhost:8081'
     
-    pix = wtools.pixiv(38279179, 'E:/pixiv_cookie.txt', save_path = pitcher_list_save_path,
+    pix = wuk.pixiv(38279179, 'E:/pixiv_cookie.txt', save_path = pitcher_list_save_path,
                     proxies = https_proxies, maxNumberThreads=16)
     
     if get_follow_list:
         print('开始获取关注列表的所有作者ID...')
         artist_list = pix.get_all_followed_artists_uids()
         print(f'获取完毕，保存至{follow_list_save_path}')
-        wtools.utils.fwrite(follow_list_save_path,
+        wuk.utils.fwrite(follow_list_save_path,
                             data = '\n'.join(artist_list).encode())
     else:
-        artist_list = wtools.utils.fread(follow_list_save_path).decode().split()
+        artist_list = wuk.utils.fread(follow_list_save_path).decode().split()
     
     for artist_id in artist_list:
         pix.multi_threaded_download(artist_id, f'{pitcher_list_save_path}/{artist_id}')
@@ -141,8 +142,40 @@ def total_download_time_required(TotalDownload :float, DownloadSpeed :float,
 
     return f'{RequiredHours = :.2f}, {RequiredMinutes = :.2f}, {RequiredSeconds = :.2f}.'
 
-def camel_to_snake(name):
-    return re.sub(r'([a-z])([A-Z])', r'\1_\2', name).lower()
+def SSLSocket_Server():
+    print(f'Call function: {inspect.currentframe().f_code.co_name}')
+    ctx = wuk.SSLSocket.SSLSocketServer('0.0.0.0', 49281, cert_path='cert/server.crt', key_path='cert/server.key')
+    ctx.handler()
+
+def SSLSocket_Client():
+    print(f'Call function: {inspect.currentframe().f_code.co_name}')
+    fd = socket.socket()
+    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ssl_ctx.load_cert_chain(certfile = 'cert/server.crt', keyfile = 'cert/server.key')
+    ssl_ctx.load_verify_locations(cafile = 'cert/server.crt')
+    ssl_fd = ssl_ctx.wrap_socket(fd, server_hostname='sngrotesque')
+    ssl_fd.connect(('127.0.0.1', 49281))
+    print(ssl_fd.recv(5))
+    ssl_fd.close()
+
+def SSLSocket_handler():
+    print(f'program pid: {os.getpid()}')
+    sign_file_path = 'C:/Users/sn/AppData/Local/Temp/sign.txt'
+    
+    if not os.path.exists(sign_file_path):
+        open(sign_file_path, 'w').close()
+        SSLSocket_Server()
+    else:
+        try:
+            SSLSocket_Client()
+            os.remove(sign_file_path)
+        except Exception as e:
+            print(f'Exception: {e}')
 
 if __name__ == '__main__':
-    encryption_speed_test(algorithmName='cc20', key_len=32, iv_len=12)
+    srcPath = [
+        r"F:\Pitchers\头像\澄闪头像\120318081_p4.png",
+        r"F:\Pitchers\头像\澄闪头像\1581.jpg"
+    ]
+    ctx = wuk.ImageToCharacterImage(srcPath[1], 'result.png')
+    ctx.draw(blackAndWhite=True, brightnessLevel=8)
