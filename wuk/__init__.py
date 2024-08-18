@@ -14,6 +14,3 @@ from .pixiv import pixiv
 from .win_key import win10_license
 
 from .SSLSocket import SSLSocketServer
-
-# SSL Socket usage:
-# from wtools.SSLSocket import ...

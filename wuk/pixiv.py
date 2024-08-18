@@ -7,12 +7,8 @@ import cv2
 import re
 import os
 
-STATUS_DONE   = 1
-STATUS_EXISTS = -1
-STATUS_FAILED = 0
-
 def fwrite_json(path :str, json_data :dict):
-    fwrite(path, data = json.dumps(json_data, ensure_ascii = False).encode())
+    fwrite(path, data = json.dumps(json_data, ensure_ascii = False, indent = 4).encode())
 
 class pixiv:
     '''
@@ -27,15 +23,19 @@ class pixiv:
     :maxNumberThreads 多线程下载时使用的线程数
     '''
     def __init__(self,
-                myID        :str | int,
-                cookies     :str,
-                save_path   :str = '.',
-                proxies     :str = 'http://localhost:1080',
+                myID             :str | int,
+                cookies          :str,
+                save_path        :str,
+                proxies          :str = 'http://localhost:1080',
                 maxNumberThreads :int = 8):
         self.maxNumberThreads = maxNumberThreads
         self.myself_id = myID
         self.save_path = save_path
         self.cookies   = None
+        
+        self.STATUS_DONE   = 1
+        self.STATUS_EXISTS = -1
+        self.STATUS_FAILED = 0
 
         if not os.path.exists(cookies):
             self.cookies = cookies
@@ -47,7 +47,7 @@ class pixiv:
         self.proxies = {'http': proxies, 'https': proxies} if proxies else None
         self.headers = {
             'Cookie': self.cookies,
-            'Accapt-Language': 'zh-CN, zh;q=0.9, en;q=0.8, en-GB;q=0.7, en-US;q=0.6',
+            'Accapt-Language': 'zh-CN, zh;q=0.9, en;q=0.8',
             'Referer': 'https://www.pixiv.net/',
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0'
         }
@@ -113,8 +113,12 @@ class pixiv:
 
     # 获取指定页码中所有作者ID
     def get_followed_artist_uids_by_page(self, page :int, offset :int) -> list[str]:
-        res = self.__http_get(f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
-            f'?offset={page * offset}&limit={offset}&rest=show').json()
+        url = (
+            f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
+            f'?offset={page * offset}&limit={offset}&rest=show'
+        )
+        
+        res = self.__http_get(url).json()
 
         # 如果获取完毕就返回一个False
         if not res['body']['users']:
@@ -158,6 +162,29 @@ class pixiv:
 
         return self.links
 
+    # 用于单独获取指定作品页面中的所有图像的下载链接（后续考虑是否转为多线程）
+    def get_artworks_illust_image_links(self, artworksID :int):
+        static_images_url = f'https://www.pixiv.net/ajax/illust/{artworksID}/pages?lang=zh'
+        dynamic_images_url = f'https://www.pixiv.net/ajax/illust/{artworksID}/ugoira_meta?lang=zh'
+        results_link = []
+
+        static_images_response = self.__http_get(static_images_url).json()
+        dynamic_images_response = self.__http_get(dynamic_images_url).json()
+
+        fwrite_json('static_images_response.json', static_images_response)
+        fwrite_json('dynamic_images_response.json', dynamic_images_response)
+
+        # 如果是静态图
+        if (static_images_response['error'] == False) and (dynamic_images_response['error'] == True):
+            for item in static_images_response['body']:
+                original_url = item['urls']['original']
+                results_link.append(original_url)
+        # 如果是动态图
+        elif dynamic_images_response['error'] == False:
+            results_link.append(dynamic_images_response['body']['originalSrc'])
+
+        return results_link
+
     # 下载单个作品（提供重连机制）
     def download(self, url :str, zipToMp4 :bool = False, ReSpecifyPath :str = None, retry_count :int = 5):
         # 如果用户指定了新的保存路径就使用新的路径以覆盖类中的save_path
@@ -170,7 +197,7 @@ class pixiv:
         fileSavePath = os.path.join(self.save_path, self.__create_filename(url))
 
         if os.path.exists(fileSavePath) or os.path.exists(fileSavePath.replace('zip', 'mp4')):
-            return STATUS_EXISTS
+            return self.STATUS_EXISTS
 
         while True:
             try:
@@ -178,7 +205,7 @@ class pixiv:
                 break
             except:
                 if not retry_count:
-                    return STATUS_FAILED
+                    return self.STATUS_FAILED
                 retry_count -= 1
 
         if response.headers['Content-Type'] == 'application/zip':
@@ -189,7 +216,7 @@ class pixiv:
         else:
             fwrite(fileSavePath, data = response.content)
 
-        return STATUS_DONE
+        return self.STATUS_DONE
 
     # 多线程下载指定作者的所有作品
     def multi_threaded_download(self, artistID :str | int, ReSpecifyPath :str = None):
@@ -201,9 +228,9 @@ class pixiv:
                 # '''
                 fn = self.__create_filename(links[index])
                 print(f'Thread[{thID:02x}] download \'{fn}\'')
-                if status == STATUS_EXISTS:
+                if status == self.STATUS_EXISTS:
                     print(f'Thread[{thID:02x}] download \'{fn}\', Exists.')
-                elif status == STATUS_FAILED:
+                elif status == self.STATUS_FAILED:
                     print(f'Thread[{thID:02x}] download \'{fn}\', Failed.')
                 # '''
         self.__threads(_download, self.get_artist_artwork_image_links(artistID))

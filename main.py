@@ -173,6 +173,9 @@ def SSLSocket_handler():
             print(f'Exception: {e}')
 
 if __name__ == '__main__':
-    path = 'F:/Pitchers/Pixiv/手动保存/119541922_p0.png'
-    png_ctx = wuk.PNG_Analysis()
-    png_ctx.analysis_process('./result.png', png_ctx.analysis(path))
+    artwork_id = 119814228
+    
+    pix = wuk.pixiv(0, 'e:/pixiv_cookie.txt', proxies = 'http://127.0.0.1:8081')
+    for url in pix.get_artworks_illust_image_links(artwork_id):
+        sign = pix.download(url)
+        print(sign)
