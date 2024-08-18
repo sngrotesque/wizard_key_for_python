@@ -173,9 +173,6 @@ def SSLSocket_handler():
             print(f'Exception: {e}')
 
 if __name__ == '__main__':
-    srcPath = [
-        r"F:\Pitchers\头像\澄闪头像\120318081_p4.png",
-        r"F:\Pitchers\头像\澄闪头像\1581.jpg"
-    ]
-    ctx = wuk.ImageToCharacterImage(srcPath[1], 'result.png')
-    ctx.draw(blackAndWhite=True, brightnessLevel=8)
+    path = 'F:/Pitchers/Pixiv/手动保存/119541922_p0.png'
+    png_ctx = wuk.PNG_Analysis()
+    png_ctx.analysis_process('./result.png', png_ctx.analysis(path))

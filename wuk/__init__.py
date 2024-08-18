@@ -7,7 +7,7 @@ from .packet import packet
 
 from .passport import PasswordCipher
 
-from .image import ImageToCharacterImage
+from .image import ImageToCharacterImage, PNG_Analysis, PNG_Write
 
 from .pixiv import pixiv
 

@@ -1,5 +1,17 @@
 from PIL import Image, ImageDraw, ImageFont
+from .crypto import get_digest
 import numpy as np
+import struct
+import zlib
+
+PNG_HEAD = b'\x89PNG\r\n\x1A\n'
+PNG_IEND = b'\0\0\0\0IEND\xaeB`\x82'
+
+def hex_to_number(hexStream :bytes):
+    return struct.unpack('>I', hexStream)[0]
+
+def number_to_hex(number :int):
+    return struct.pack('>I', number)
 
 class ImageToCharacterImage:
     def __init__(self, src_path :str, dst_path :str,
@@ -92,3 +104,140 @@ class ImageToCharacterImage:
             img.save(self.dst_path)
             if show:
                 img.show()
+
+class PNG_Analysis:
+    def analysis(self, path :str):
+        analysis_result = {
+            "MD5": None,
+            "SHA-1": None,
+            "SHA-256": None,
+            # "SHA-512": None,
+            "Chunks": []
+        }
+
+        with open(path, 'rb') as f:
+            file_content = f.read()
+
+            if file_content[:8] != PNG_HEAD:
+                raise TypeError(f'\'{path}\' is not a PNG image.')
+
+            analysis_result['MD5']     = get_digest(file_content, 'md5')
+            analysis_result['SHA-1']   = get_digest(file_content, 'sha1')
+            analysis_result['SHA-256'] = get_digest(file_content)
+
+            f.seek(len(PNG_HEAD)) # 将指针跳转到文件开头并跳过文件标识数据头
+
+            while True:
+                pos   = f.tell()
+                
+                size  = hex_to_number(f.read(4))
+                name  = f.read(4).decode()
+                data  = f.read(size)
+                crc32 = hex_to_number(f.read(4))
+
+                analysis_result['Chunks'].append(
+                    {
+                        "pos":   pos,
+                        "size":  size,
+                        "name":  name,
+                        "data":  data,
+                        "crc32": crc32
+                    }
+                )
+
+                if name == 'IEND':
+                    break
+
+        return analysis_result
+
+    def analysis_process(self, path :str, png_structure :dict[str, any]):
+        with open(path, 'wb') as f:
+            new_structure = png_structure['Chunks']
+
+            while True:
+                print([chunk['name'] for chunk in new_structure])
+
+                chunk_name = input('请输入要删除的块名称：')
+                if chunk_name in ('exit', 'quit', 'done'):
+                    break
+
+                if chunk_name in ('IHDR', 'IDAT', 'IEND'):
+                    raise ValueError('You should not delete this chunk.')
+
+                new_structure = [item for item in new_structure if item['name'] != chunk_name]
+
+            f.write(PNG_HEAD)
+
+            for item in new_structure:
+                chunks = b''.join((
+                    number_to_hex(item['size']),
+                    item['name'].encode(),
+                    item['data'],
+                    number_to_hex(item['crc32'])
+                ))
+
+                f.write(chunks)
+
+class PNG_Write:
+    def __init__(self):
+        self.width = None
+        self.height = None
+        
+        self.IHDR = None
+        self.IDAT = []
+        self.IEND = PNG_IEND
+    
+    def build_IHDR(self,
+                width       :int,
+                height      :int,
+                bit_depth   :int = 8,
+                color_type  :int = 2,
+                compression :int = 0,
+                filter      :int = 0,
+                scan_mode   :int = 0
+                ) -> None:
+        self.width = width
+        self.height = height
+        
+        IHDR_chunk = struct.pack(
+            '>I4sIIBBBBB',
+            13,          # length
+            b'IHDR',     # name
+            width,       # image width
+            height,      # image height
+            bit_depth,   # image bit depth
+            color_type,  # image color type
+            compression, # compression method
+            filter,      # filter method
+            scan_mode    # scan mode
+        )
+        IHDR_crc32 = number_to_hex(zlib.crc32(IHDR_chunk[4:]))
+        self.IHDR = b''.join((IHDR_chunk, IHDR_crc32))
+
+    def build_IDAT(self, content :bytes) -> None:
+        def split(data :bytes, splitNumber :int):
+            # 将传入的数据按照splitNumber指定的长度进行分组，并在每个分组前添加一个00
+            data = [data[x:x+splitNumber] for x in range(0, len(data), splitNumber)]
+            return b'\x00' + b'\x00'.join(data)
+
+        compressed = zlib.compress(split(content, self.width * 3))
+        IDAT_chunk = struct.pack(f'>I4s{len(compressed)}s',
+            len(compressed), # length
+            b'IDAT',         # name
+            compressed,      # data
+            )
+        IDAT_crc32 = number_to_hex(zlib.crc32(IDAT_chunk[4:]))
+        
+        IDAT = b''.join((IDAT_chunk, IDAT_crc32))
+        
+        self.IDAT.append(IDAT)
+
+    def build_PNG_image(self):
+        png_data = [PNG_HEAD, self.IHDR]
+        
+        for item in self.IDAT:
+            png_data.append(item)
+        
+        png_data.append(self.IEND)
+        
+        return b''.join(png_data)

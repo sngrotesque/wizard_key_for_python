@@ -101,5 +101,5 @@ if __name__ == '__main__':
     dict_file_out = input('请输入加/解密后密码文件路径：')
     ctx           = PasswordCipher(user_token, dict_file_in, dict_file_out, verify_block)
 
-    # ctx.encryption_write(ctx.get_dict_key())
-    ctx.decryption_write(ctx.get_dict_key())
+    ctx.encryption_write(ctx.get_dict_key())
+    # ctx.decryption_write(ctx.get_dict_key())
