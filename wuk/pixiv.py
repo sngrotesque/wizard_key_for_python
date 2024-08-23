@@ -10,6 +10,12 @@ import os
 def fwrite_json(path :str, json_data :dict):
     fwrite(path, data = json.dumps(json_data, ensure_ascii = False, indent = 4).encode())
 
+class Pixiv:
+    def __init__(self, my_id :int, cookies :str, proxy :str):
+        self._my_id   = my_id
+        self._cookies = cookies
+        self._proxies = {'http': proxy, 'https': proxy} if proxy else None
+
 class pixiv:
     '''
     这里需要着重声明一个事情，如果你在调用getTotalArtistList方法后发现得到的数量少于Pixiv官网的数量。
@@ -171,8 +177,8 @@ class pixiv:
         static_images_response = self.__http_get(static_images_url).json()
         dynamic_images_response = self.__http_get(dynamic_images_url).json()
 
-        fwrite_json('static_images_response.json', static_images_response)
-        fwrite_json('dynamic_images_response.json', dynamic_images_response)
+        # fwrite_json('static_images_response.json', static_images_response)
+        # fwrite_json('dynamic_images_response.json', dynamic_images_response)
 
         # 如果是静态图
         if (static_images_response['error'] == False) and (dynamic_images_response['error'] == True):

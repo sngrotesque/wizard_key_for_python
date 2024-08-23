@@ -1,0 +1,17 @@
+url: https://www.pixiv.net/ajax/user/38279179/illusts/bookmarks
+query:
+    tag     =
+    offset  = 0
+    limit   = 48
+    rest    = show
+    lang    = zh
+    version = 82fb5664f0a655bc73d39801ea108669064b8d94
+
+Request Method: GET
+
+Request Headers:
+    Cookie: True
+    Referer: True
+
+Response Headers:
+    Content-Type: application/json

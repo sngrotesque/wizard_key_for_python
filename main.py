@@ -172,10 +172,18 @@ def SSLSocket_handler():
         except Exception as e:
             print(f'Exception: {e}')
 
+def a():
+    try:
+        return 1+1
+    except:
+        return 2+2
+    finally:
+        return 3+3
+
 if __name__ == '__main__':
-    artwork_id = 119814228
-    
-    pix = wuk.pixiv(0, 'e:/pixiv_cookie.txt', proxies = 'http://127.0.0.1:8081')
-    for url in pix.get_artworks_illust_image_links(artwork_id):
-        sign = pix.download(url)
-        print(sign)
+    # artwork_id = 119814228
+    # pix = wuk.pixiv(0, 'e:/pixiv_cookie.txt', proxies = 'http://127.0.0.1:8081')
+    # for url in pix.get_artworks_illust_image_links(artwork_id):
+    #     sign = pix.download(url)
+    #     print(sign)
+    pass
