@@ -107,13 +107,12 @@ class Pixiv:
         os.remove(file_save_path)
         os.removedirss(img2mp4_tmp_path)
 
-class Pixiv_Artworks(Pixiv):
+class PixivArtworks(Pixiv):
     def __init__(self,
                 cookies :str,
                 my_id :int = 0,
                 proxy :str = 'http://127.0.0.1:1080/',
-                maxThreads :int = 8
-                ):
+                maxThreads :int = 8):
         super().__init__(my_id, cookies, proxy, maxThreads)
 
     '''
@@ -257,9 +256,31 @@ class Pixiv_Artworks(Pixiv):
                     print(f'\'{urls[item]}\' failed.')
         self.threads_call(__download, urls)
 
-if __name__ == '__main__':
-    pix = Pixiv_Artworks('e:/pixiv_cookie.txt', proxy='http://127.0.0.1:8081')
-    pix.threads_download(pix.get_artworks_illust_images_url(120302142),
-                        'f:/Pitchers/pixiv/8511817')
+class PixivBookmarks(Pixiv):
+    def __init__(self,
+                cookies :str,
+                my_id :int = 0,
+                proxy :str = 'http://127.0.0.1:1080/',
+                maxThreads :int = 8):
+        super().__init__(my_id, cookies, proxy, maxThreads)
 
+    def get_bookmarks_artworks(self):
+        tag    = '' # 收藏标签
+        limit  = 48 # 单次累加的最小量
+        offset = 0  # 偏移量（理解为页码即可）
+        
+        '''公开收藏夹(show) or 非公开收藏夹(hide)，
+        如果是查看别人的收藏夹的话，将无法查看非公开收藏夹'''
+        rest   = 'show'
+
+        url = ('https://www.pixiv.net/ajax/user/38279179/illusts/bookmarks'
+            f'?tag={tag}&{offset=}&{limit=}&rest={rest}'
+        )
+
+        print(url)
+
+if __name__ == '__main__':
+    pix = PixivArtworks('e:/pixiv_cookie.txt', proxy='http://127.0.0.1:8081')
+    urls = pix.get_artworks_illust_images_url(121654538)
+    pix.threads_download(urls, 'F:/Pitchers/Pixiv/8511817/')
 
