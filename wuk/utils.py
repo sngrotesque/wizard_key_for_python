@@ -1,4 +1,4 @@
-def fread(path :str, mode :str = 'rb', encoding :str = None) -> bytes:
+def fread(path :str, mode :str = 'rb', encoding :str = None) -> bytes | str:
     with open(path, mode, encoding = encoding) as f_obj:
         return f_obj.read()
 

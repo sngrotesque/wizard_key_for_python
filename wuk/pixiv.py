@@ -1,242 +1,311 @@
-from .utils import fread, fwrite
+try:
+    from utils import fread, fwrite
+except ImportError:
+    from .utils import fread, fwrite
+
 from zipfile import ZipFile
 import threading
 import requests
+import random
 import json
 import cv2
 import re
 import os
 
-def fwrite_json(path :str, json_data :dict):
-    fwrite(path, data = json.dumps(json_data, ensure_ascii = False, indent = 4).encode())
+user_agent_list = [
+    'Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.61 Chrome/126.0.6478.61 Not/A)Brand/8  Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0 Config/100.2.9281.82',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 OPR/111.0.0.0 (Edition Yx 05)',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/128.0.0.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:129.0) Gecko/20100101 Firefox/129.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/128.0.0.0'
+]
 
 class Pixiv:
-    def __init__(self, my_id :int, cookies :str, proxy :str):
-        self._my_id   = my_id
-        self._cookies = cookies
-        self._proxies = {'http': proxy, 'https': proxy} if proxy else None
-
-class pixiv:
-    '''
-    这里需要着重声明一个事情，如果你在调用getTotalArtistList方法后发现得到的数量少于Pixiv官网的数量。
-    这不是我代码的问题，这是Pixiv的问题。
-    不信的话你可以在getArtistList方法中检测每一页的作者数量然后和Pixiv官网的那一页的数量作对比。
-    
-    :myID 你自己在Pixiv的ID
-    :cookies 你在Pixiv的Cookie，可以cookie明文文件的路径也可以直接是cookie字符串。
-    :save_path 你需要将下载的图片保存在哪
-    :proxies 你设置的代理（如果需要）
-    :maxNumberThreads 多线程下载时使用的线程数
-    '''
     def __init__(self,
-                myID             :str | int,
-                cookies          :str,
-                save_path        :str,
-                proxies          :str = 'http://localhost:1080',
-                maxNumberThreads :int = 8):
-        self.maxNumberThreads = maxNumberThreads
-        self.myself_id = myID
-        self.save_path = save_path
-        self.cookies   = None
-        
-        self.STATUS_DONE   = 1
-        self.STATUS_EXISTS = -1
-        self.STATUS_FAILED = 0
+                my_id      :int,
+                cookies    :str,
+                proxy      :str = 'http://127.0.0.1:1080/',
+                maxThreads :int = 8):
+        self._my_id   = my_id
+        self._proxies = {'http': proxy, 'https': proxy} if proxy else None
+        self._cookies = fread(cookies).decode() if os.path.exists(cookies) else cookies
+        self._threads = maxThreads
 
-        if not os.path.exists(cookies):
-            self.cookies = cookies
-        elif os.path.exists(cookies):
-            self.cookies = fread(cookies).decode()
-        else:
-            raise ValueError('缺少Cookie，无法进行爬取。')
-
-        self.proxies = {'http': proxies, 'https': proxies} if proxies else None
-        self.headers = {
-            'Cookie': self.cookies,
-            'Accapt-Language': 'zh-CN, zh;q=0.9, en;q=0.8',
+        self._headers = {
+            'Cookie': self._cookies,
+            'Accapt-Language': 'zh-CN, zh;q=0.9, en;q=0.8, jp;q=0-7',
             'Referer': 'https://www.pixiv.net/',
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0'
+            'User-Agent': random.choice(user_agent_list)
         }
 
-    # 开启指定数量的线程并执行
-    def __threads(self, func :callable, url_list :list[str]):
-        th_list = [threading.Thread(target = func, args = (thId, url_list)) for thId in range(self.maxNumberThreads)]
+        self.status_done   = 2
+        self.status_exists = 1
+        self.status_failed = 0
 
-        for th in th_list:
+    def threads_call(self, function :callable, item_list :list[str]):
+        ths = [
+            threading.Thread(target = function, args = (th_id, item_list))
+            for th_id in range(self._threads)
+        ]
+        for th in ths:
             th.start()
-
-        for th in th_list:
+        for th in ths:
             th.join()
 
-    # 封装HTTP请求
-    def __http_get(self, url :str):
-        return requests.get(url, headers = self.headers, proxies = self.proxies)
+    def http_get(self, url :str):
+        return requests.get(url,  headers = self._headers, proxies = self._proxies)
 
-    # 根据下载链接来创建一个文件名
-    def __create_filename(self, url :str):
-        return re.findall(r'\w+://[a-zA-Z0-9.\-\_]+/[a-zA-Z\-\_]+/img/([0-9a-zA-Z./\_]+)',
-            url, re.S | re.I)[0].replace('/', '_')
+    def create_filename_form_url(self, url :str):
+        result :str = re.findall(
+                            r'^\w+://'
+                            r'[\w\d.]+/'
+                            r'[\w\-\_]+/img/'
+                            r'([\w\d./\_]+)$',
+                            url, re.S)[0]
+        return result.replace('/', '_')
 
-    # 指定一个Jpg图像文件路径的列表，将它们依次转为视频的每一帧
-    def __img_to_mp4(self, inPath :list[str], outPath :str, fps :int = 15):
-        img_array = []
+    def image_to_mp4(self, image_path :list[str], mp4_path :str, fps :int = 15):
+        image_array = []
+        
+        for fn in image_path:
+            ctx = cv2.imread(fn)
+            height, width, layers = ctx.shape
+            image_array.append(ctx)
 
-        for filename in inPath:
-            img = cv2.imread(filename)
-            height, width, layers = img.shape
-            img_array.append(img)
+        with cv2.VideoWriter(mp4_path, cv2.VideoWriter_fourcc(*'DIVX'),
+                            fps, (width, height)) as mp4_ctx:
+            for image in image_array:
+                mp4_ctx.write(image)
 
-        out = cv2.VideoWriter(outPath, cv2.VideoWriter_fourcc(*'DIVX'), fps, (width, height))
+    def zip_to_mp4(self, url :str, file_save_path :str, content :bytes, mp4_save_path :str):
+        fwrite(file_save_path, data = content)
 
-        for i in img_array:
-            out.write(i)
+        with ZipFile(file_save_path, 'r') as ctx:
+            zip_fn_list = ctx.namelist()
+            img2mp4_tmp_path = f'{file_save_path}_tmp'
+            
+            if not os.path.exists(img2mp4_tmp_path):
+                os.makedirs(img2mp4_tmp_path)
 
-        out.release()
+            ctx.extractall(img2mp4_tmp_path)
 
-    # 将Zip压缩包里面的图像转为视频
-    def __zip_to_mp4(self, link :str, fileSavePath :str, content :bytes, folder :str):
-        fwrite(fileSavePath, data = content)
+        image_path = [
+            os.path.join(img2mp4_tmp_path, fn)
+            for fn in zip_fn_list
+        ]
+        mp4_fn = self.create_filename_form_url(url).replace('zip', 'mp4')
 
-        with ZipFile(fileSavePath, 'r') as ctx:
-            zip_filename_list = ctx.namelist()
-            jpgToMp4TempSavePath = f'{fileSavePath}_Temp'
+        self.image_to_mp4(image_path, os.path.join(mp4_save_path, mp4_fn))
 
-            if not os.path.exists(jpgToMp4TempSavePath):
-                os.makedirs(jpgToMp4TempSavePath)
-
-            ctx.extractall(jpgToMp4TempSavePath)
-
-        jpgPath = [os.path.join(jpgToMp4TempSavePath, fn) for fn in zip_filename_list]
-        gifFileName = self.__create_filename(link).replace('zip', 'mp4')
-
-        self.__img_to_mp4(jpgPath, os.path.join(folder, gifFileName))
-
-        for fn in jpgPath:
+        for fn in image_path:
             os.remove(fn)
 
-        os.remove(fileSavePath)
-        os.removedirs(jpgToMp4TempSavePath)
+        os.remove(file_save_path)
+        os.removedirss(img2mp4_tmp_path)
 
-    # 获取指定页码中所有作者ID
+    def download(self, url :str, save_path :str, zip2mp4 :bool = True):
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+
+        image_save_path = os.path.join(save_path, self.create_filename_form_url(url))
+
+        if os.path.exists(image_save_path) or os.path.exists(image_save_path.replace('zip', 'mp4')):
+            return self.status_exists
+
+        try:
+            response = self.http_get(url)
+        except Exception as e:
+            return self.status_failed, e
+
+        if (response.headers['Content-Type'] == 'application/zip') and zip2mp4:
+            self.zip_to_mp4(url, image_save_path, response.content, save_path)
+        else:
+            fwrite(image_save_path, data = response.content)
+
+        return True
+
+    def threads_download(self, urls :list[str], save_path :str):
+        def __download(th_id :int, urls :list[str]):
+            for item in range(th_id, len(urls), self._threads):
+                status = self.download(urls[item], save_path)
+                if status == self.status_exists:
+                    print(f'\'{urls[item]}\' exists.')
+                elif status == self.status_failed:
+                    print(f'\'{urls[item]}\' failed.')
+        self.threads_call(__download, urls)
+
+class PixivArtworks(Pixiv):
+    def __init__(self,
+                cookies :str,
+                my_id :int = 0,
+                proxy :str = 'http://127.0.0.1:1080/',
+                maxThreads :int = 8):
+        super().__init__(my_id, cookies, proxy, maxThreads)
+
+    '''
+    获取指定页码中已关注的作者的UID
+    
+    page: 页码
+    offset: 偏移量（如果你不知道，那说明你不该自己调用这个方法）
+    '''
     def get_followed_artist_uids_by_page(self, page :int, offset :int) -> list[str]:
+        print('call get_followed_artist_uids_by_page.')
         url = (
             f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
             f'?offset={page * offset}&limit={offset}&rest=show'
         )
-        
-        res = self.__http_get(url).json()
 
-        # 如果获取完毕就返回一个False
-        if not res['body']['users']:
+        response = self.http_get(url).json()
+
+        if not response['body']['users']:
             return False
-        # 否则返回当前页获取的ID列表
-        return [index['userId'] for index in res['body']['users']]
 
-    # 获取自己关注的所有作者的ID
-    def get_all_followed_artists_uids(self, offset :int = 24):
+        return [item['userId'] for item in response['body']['users']]
+
+    '''
+    获取自己已关注的所有作者的UID
+    
+    offset: 偏移量
+    '''
+    def get_all_followed_artist_uids(self, offset :int = 24):
+        print('call get_all_followed_artist_uids.')
         results = []
+        
         for page in range(0, int(offset * 1e6)):
             result = self.get_followed_artist_uids_by_page(page, offset)
+            
             if not result:
                 break
-            results += result
+            
+            results.extend(result)
+
         return results
 
-    # 多线程获取指定作者的所有作品中的所有图像的链接
-    # 这个方法如果改为单线程，那么速度堪忧并且没法兼容多线程下载图像
-    def get_artist_artwork_image_links(self, artistID :str | int):
-        artworks = [*self.__http_get(f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
-            f'?lang=zh').json()['body']['illusts'].keys()]
+    '''
+    获取作品页面中所有的动态图像（一般来说，你不应该自己调用这个方法）
+    
+    @return 如果作品不是动态图，就返回False，否则返回压缩包链接。
+    @param
+        artworkID: 作品ID
+    '''
+    def get_artworks_illust_images_url_for_dynamic(self, artworkID :int) -> str | bool:
+        print('call get_artworks_illust_images_url_for_dynamic.')
+        dynamic_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/ugoira_meta'
+        dynamic_images_response = self.http_get(dynamic_images_url).json()
+        if dynamic_images_response['error'] == False:
+            return dynamic_images_response['body']['originalSrc']
+        return False
 
-        self.links = []
-        def get_images(thID :int, artworks :list[str]):
-            for pid in range(thID, len(artworks), self.maxNumberThreads):
-                print(f'Thread[{thID:02x}] obtains the image link in PID[{artworks[pid]}].')
-                dynamicImageUrl = f'https://www.pixiv.net/ajax/illust/{artworks[pid]}/ugoira_meta?lang=zh'
-                staticImageUrl = f'https://www.pixiv.net/ajax/illust/{artworks[pid]}/pages?lang=zh'
-
-                dynamicImage_result = self.__http_get(dynamicImageUrl).json()
-                statucImage_result = self.__http_get(staticImageUrl).json()
-
-                if not dynamicImage_result['error']:
-                    self.links.append(dynamicImage_result['body']['originalSrc'])
-                else:
-                    for index in statucImage_result['body']:
-                        self.links.append(index['urls']['original'])
-
-        self.__threads(get_images, artworks)
-
-        return self.links
-
-    # 用于单独获取指定作品页面中的所有图像的下载链接（后续考虑是否转为多线程）
-    def get_artworks_illust_image_links(self, artworksID :int):
-        static_images_url = f'https://www.pixiv.net/ajax/illust/{artworksID}/pages?lang=zh'
-        dynamic_images_url = f'https://www.pixiv.net/ajax/illust/{artworksID}/ugoira_meta?lang=zh'
-        results_link = []
-
-        static_images_response = self.__http_get(static_images_url).json()
-        dynamic_images_response = self.__http_get(dynamic_images_url).json()
-
-        # fwrite_json('static_images_response.json', static_images_response)
-        # fwrite_json('dynamic_images_response.json', dynamic_images_response)
-
-        # 如果是静态图
-        if (static_images_response['error'] == False) and (dynamic_images_response['error'] == True):
+    '''
+    获取作品页面中所有的静态图像（一般来说，你不应该自己调用这个方法）
+    
+    @return 如果作品不是静态图，就返回False，否则返回作品链接列表。
+            但通常来说，这个永远不会返回False，所以应该直接判断是否是动态图。
+    @param
+        artworkID: 作品ID
+    '''
+    def get_artworks_illust_images_url_for_static(self, artworkID :int) -> list[str] | bool:
+        print('call get_artworks_illust_images_url_for_static.')
+        static_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/pages'
+        static_images_response = self.http_get(static_images_url).json()
+        results = []
+        if static_images_response['error'] == False:
             for item in static_images_response['body']:
                 original_url = item['urls']['original']
-                results_link.append(original_url)
-        # 如果是动态图
-        elif dynamic_images_response['error'] == False:
-            results_link.append(dynamic_images_response['body']['originalSrc'])
+                results.append(original_url)
+            return results
+        return False
 
-        return results_link
+    '''
+    获取作品页面中所有图像（自动区分静态图和动态图）
+    
+    @return 如果是动态图就返回压缩包链接否则静态图列表。
+    @param
+        artworkID: 作品ID
+    '''
+    def get_artworks_illust_images_url(self, artworkID :int):
+        print('call get_artworks_illust_images_url.')
+        dynamic_result = self.get_artworks_illust_images_url_for_dynamic(artworkID)
+        if dynamic_result == False:
+            return self.get_artworks_illust_images_url_for_static(artworkID)
+        return dynamic_result
 
-    # 下载单个作品（提供重连机制）
-    def download(self, url :str, zipToMp4 :bool = False, ReSpecifyPath :str = None, retry_count :int = 5):
-        # 如果用户指定了新的保存路径就使用新的路径以覆盖类中的save_path
-        if ReSpecifyPath:
-            self.save_path = ReSpecifyPath
+    '''
+    获取指定作者的所有作品页面中所有图像（自动区分静态图和动态图）
+    
+    @return 含可能的压缩包链接和静态图链接的列表
+    @param
+        artistID: 作者UID
+    '''
+    def get_artist_artwork_images_url(self, artistID :int) -> list[str]:
+        print('call get_artist_artwork_images_url.')
+        url = f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
+        artworks_keys = [*self.http_get(url).json()['body']['illusts'].keys()]
 
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
-
-        fileSavePath = os.path.join(self.save_path, self.__create_filename(url))
-
-        if os.path.exists(fileSavePath) or os.path.exists(fileSavePath.replace('zip', 'mp4')):
-            return self.STATUS_EXISTS
-
-        while True:
-            try:
-                response = self.__http_get(url)
-                break
-            except:
-                if not retry_count:
-                    return self.STATUS_FAILED
-                retry_count -= 1
-
-        if response.headers['Content-Type'] == 'application/zip':
-            if zipToMp4:
-                self.__zip_to_mp4(url, fileSavePath, response.content, self.save_path)
-            else:
-                fwrite(fileSavePath, data = response.content)
-        else:
-            fwrite(fileSavePath, data = response.content)
-
-        return self.STATUS_DONE
-
-    # 多线程下载指定作者的所有作品
-    def multi_threaded_download(self, artistID :str | int, ReSpecifyPath :str = None):
-        def _download(thID :int, links :list[str]):
-            for index in range(thID, len(links), self.maxNumberThreads):
+        self.links = []
+        def get_images(th_id :int, artworks :list[int]):
+            for pid in range(th_id, len(artworks), self._threads):
+                _pid = artworks[pid]
+                dynamic_result = self.get_artworks_illust_images_url_for_dynamic(_pid)
+                static_result  = self.get_artworks_illust_images_url_for_static(_pid)
                 
-                status = self.download(links[index], zipToMp4 = True, ReSpecifyPath = ReSpecifyPath)
-                
-                # '''
-                fn = self.__create_filename(links[index])
-                print(f'Thread[{thID:02x}] download \'{fn}\'')
-                if status == self.STATUS_EXISTS:
-                    print(f'Thread[{thID:02x}] download \'{fn}\', Exists.')
-                elif status == self.STATUS_FAILED:
-                    print(f'Thread[{thID:02x}] download \'{fn}\', Failed.')
-                # '''
-        self.__threads(_download, self.get_artist_artwork_image_links(artistID))
+                if dynamic_result == False:
+                    self.links.extend(static_result)
+                else:
+                    self.links.append(dynamic_result)
+
+        self.threads_call(get_images, artworks_keys)
+        return self.links
+
+class PixivBookmarks(Pixiv):
+    def __init__(self,
+                cookies :str,
+                my_id :int = 0,
+                proxy :str = 'http://127.0.0.1:1080/',
+                maxThreads :int = 8):
+        super().__init__(my_id, cookies, proxy, maxThreads)
+
+    '''
+    获取指定的收藏夹页码中的所有作品ID。
+    
+    @param
+        userId  指定的用户ID
+        page    页码数
+        tag     收藏的Tag
+        rest    公开收藏夹(show) or 非公开收藏夹(hide)
+    @return
+        返回一个作品ID列表
+    '''
+    def get_bookmarks_artworks(self, userId :int, page :int, tag :str = '', rest :str = 'show'):
+        results = []
+        limit   = 48 # 单次累加的最小量
+
+        url = (
+            f'https://www.pixiv.net/ajax/user/{userId}/illusts/bookmarks'
+            f'?tag={tag}&offset={(page-1)*limit}&{limit=}&rest={rest}'
+        )
+
+        response = self.http_get(url).json()
+
+        for item in response['body']['works']:
+            results.append(item['id'])
+
+        return results
+
+if __name__ == '__main__':
+    cookie_path = 'e:/pixiv_cookie.txt'
+    proxy = 'http://127.0.0.1:8081'
+    
+    pix_bm = PixivBookmarks(cookie_path, proxy = proxy)
+    pix_aw = PixivArtworks(cookie_path, proxy = proxy)
+
+    bookmarks_artwork_ids = pix_bm.get_bookmarks_artworks(38279179, 1)
+    for artwork_id in bookmarks_artwork_ids:
+        for url in pix_aw.get_artworks_illust_images_url(artwork_id):
+            res = pix_bm.download(url, 'f:/Pitchers/Pixiv/手动保存/test')
+            print(res)
+
