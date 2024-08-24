@@ -59,7 +59,7 @@ class Pixiv:
     def http_get(self, url :str):
         return requests.get(url,  headers = self._headers, proxies = self._proxies)
 
-    def create_filename_form_url(self, url :str):
+    def create_filename_from_url(self, url :str):
         result :str = re.findall(
                             r'^\w+://'
                             r'[\w\d.]+/'
@@ -97,7 +97,7 @@ class Pixiv:
             os.path.join(img2mp4_tmp_path, fn)
             for fn in zip_fn_list
         ]
-        mp4_fn = self.create_filename_form_url(url).replace('zip', 'mp4')
+        mp4_fn = self.create_filename_from_url(url).replace('zip', 'mp4')
 
         self.image_to_mp4(image_path, os.path.join(mp4_save_path, mp4_fn))
 
@@ -111,7 +111,7 @@ class Pixiv:
         if not os.path.exists(save_path):
             os.mkdir(save_path)
 
-        image_save_path = os.path.join(save_path, self.create_filename_form_url(url))
+        image_save_path = os.path.join(save_path, self.create_filename_from_url(url))
 
         if os.path.exists(image_save_path) or os.path.exists(image_save_path.replace('zip', 'mp4')):
             return self.status_exists
