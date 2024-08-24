@@ -153,7 +153,6 @@ class PixivArtworks(Pixiv):
     offset: 偏移量（如果你不知道，那说明你不该自己调用这个方法）
     '''
     def get_followed_artist_uids_by_page(self, page :int, offset :int) -> list[str]:
-        print('call get_followed_artist_uids_by_page.')
         url = (
             f'https://www.pixiv.net/ajax/user/{self.myself_id}/following'
             f'?offset={page * offset}&limit={offset}&rest=show'
@@ -172,7 +171,6 @@ class PixivArtworks(Pixiv):
     offset: 偏移量
     '''
     def get_all_followed_artist_uids(self, offset :int = 24):
-        print('call get_all_followed_artist_uids.')
         results = []
         
         for page in range(0, int(offset * 1e6)):
@@ -193,7 +191,6 @@ class PixivArtworks(Pixiv):
         artworkID: 作品ID
     '''
     def get_artworks_illust_images_url_for_dynamic(self, artworkID :int) -> str | bool:
-        print('call get_artworks_illust_images_url_for_dynamic.')
         dynamic_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/ugoira_meta'
         dynamic_images_response = self.http_get(dynamic_images_url).json()
         if dynamic_images_response['error'] == False:
@@ -209,7 +206,6 @@ class PixivArtworks(Pixiv):
         artworkID: 作品ID
     '''
     def get_artworks_illust_images_url_for_static(self, artworkID :int) -> list[str] | bool:
-        print('call get_artworks_illust_images_url_for_static.')
         static_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/pages'
         static_images_response = self.http_get(static_images_url).json()
         results = []
@@ -228,7 +224,6 @@ class PixivArtworks(Pixiv):
         artworkID: 作品ID
     '''
     def get_artworks_illust_images_url(self, artworkID :int):
-        print('call get_artworks_illust_images_url.')
         dynamic_result = self.get_artworks_illust_images_url_for_dynamic(artworkID)
         if dynamic_result == False:
             return self.get_artworks_illust_images_url_for_static(artworkID)
@@ -242,7 +237,6 @@ class PixivArtworks(Pixiv):
         artistID: 作者UID
     '''
     def get_artist_artwork_images_url(self, artistID :int) -> list[str]:
-        print('call get_artist_artwork_images_url.')
         url = f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
         artworks_keys = [*self.http_get(url).json()['body']['illusts'].keys()]
 
@@ -281,7 +275,6 @@ class PixivBookmarks(Pixiv):
         返回一个作品ID列表
     '''
     def get_bookmarks_artworks(self, userId :int, page :int, tag :str = '', rest :str = 'show'):
-        results = []
         limit   = 48 # 单次累加的最小量
 
         url = (
@@ -291,21 +284,21 @@ class PixivBookmarks(Pixiv):
 
         response = self.http_get(url).json()
 
-        for item in response['body']['works']:
-            results.append(item['id'])
-
-        return results
+        return [item['id'] for item in response['body']['works']]
 
 if __name__ == '__main__':
     cookie_path = 'e:/pixiv_cookie.txt'
     proxy = 'http://127.0.0.1:8081'
+    save_path = 'f:/Pitchers/Pixiv/手动保存/test'
     
     pix_bm = PixivBookmarks(cookie_path, proxy = proxy)
     pix_aw = PixivArtworks(cookie_path, proxy = proxy)
 
     bookmarks_artwork_ids = pix_bm.get_bookmarks_artworks(38279179, 1)
     for artwork_id in bookmarks_artwork_ids:
-        for url in pix_aw.get_artworks_illust_images_url(artwork_id):
-            res = pix_bm.download(url, 'f:/Pitchers/Pixiv/手动保存/test')
-            print(res)
+        urls = pix_aw.get_artworks_illust_images_url(artwork_id)
+        if len(urls) == 1:
+            pix_bm.download(urls[0], save_path)
+        else:
+            pix_bm.threads_download(urls, save_path)
 
