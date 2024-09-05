@@ -56,8 +56,8 @@ class Pixiv:
         for th in ths:
             th.join()
 
-    def http_get(self, url :str):
-        return requests.get(url,  headers = self._headers, proxies = self._proxies)
+    def http_request(self, url :str, request_method :str = 'get'):
+        return getattr(requests, request_method.lower())(url, headers = self._headers, proxies = self._proxies)
 
     def create_filename_from_url(self, url :str):
         result :str = re.findall(
@@ -117,7 +117,7 @@ class Pixiv:
             return self.status_exists
 
         try:
-            response = self.http_get(url)
+            response = self.http_request(url)
         except Exception as e:
             return self.status_failed, e
 
@@ -158,7 +158,7 @@ class PixivArtworks(Pixiv):
             f'?offset={page * offset}&limit={offset}&rest=show'
         )
 
-        response = self.http_get(url).json()
+        response = self.http_request(url).json()
 
         if not response['body']['users']:
             return False
@@ -192,7 +192,7 @@ class PixivArtworks(Pixiv):
     '''
     def get_artworks_illust_images_url_for_dynamic(self, artworkID :int) -> str | bool:
         dynamic_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/ugoira_meta'
-        dynamic_images_response = self.http_get(dynamic_images_url).json()
+        dynamic_images_response = self.http_request(dynamic_images_url).json()
         if dynamic_images_response['error'] == False:
             return dynamic_images_response['body']['originalSrc']
         return False
@@ -207,7 +207,7 @@ class PixivArtworks(Pixiv):
     '''
     def get_artworks_illust_images_url_for_static(self, artworkID :int) -> list[str] | bool:
         static_images_url = f'https://www.pixiv.net/ajax/illust/{artworkID}/pages'
-        static_images_response = self.http_get(static_images_url).json()
+        static_images_response = self.http_request(static_images_url).json()
         results = []
         if static_images_response['error'] == False:
             for item in static_images_response['body']:
@@ -238,7 +238,7 @@ class PixivArtworks(Pixiv):
     '''
     def get_artist_artwork_images_url(self, artistID :int) -> list[str]:
         url = f'https://www.pixiv.net/ajax/user/{artistID}/profile/all'
-        artworks_keys = [*self.http_get(url).json()['body']['illusts'].keys()]
+        artworks_keys = [*self.http_request(url).json()['body']['illusts'].keys()]
 
         self.links = []
         def get_images(th_id :int, artworks :list[int]):
@@ -282,14 +282,14 @@ class PixivBookmarks(Pixiv):
             f'?tag={tag}&offset={(page-1)*limit}&{limit=}&rest={rest}'
         )
 
-        response = self.http_get(url).json()
+        response = self.http_request(url).json()
 
         return [item['id'] for item in response['body']['works']]
 
 if __name__ == '__main__':
-    cookie_path = 'e:/pixiv_cookie.txt'
-    proxy = 'http://127.0.0.1:8081'
-    save_path = 'f:/Pitchers/Pixiv/手动保存/test'
+    cookie_path = 'Z:/pixiv_cookie.txt'
+    proxy = 'http://127.0.0.1:1080'
+    save_path = 'C:/Users/Administrator/Desktop/test'
     
     pix_bm = PixivBookmarks(cookie_path, proxy = proxy)
     pix_aw = PixivArtworks(cookie_path, proxy = proxy)
